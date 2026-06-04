@@ -1,0 +1,278 @@
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGridLayout, QFileDialog, QMessageBox, QTableWidget, QTableWidgetItem
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
+from pathlib import Path
+
+from app.data.import_manager import DataImportManager
+from app.utils.config import COLORPRIMARY, COLORSUCCESS, ADMINUSERS, POWERUSERS
+
+class DataImportsWindow(QMainWindow):
+    def __init__(self, userdata, parent=None):
+        super().__init__(parent)
+        self.userdata = userdata if isinstance(userdata, dict) else {'username': userdata}
+        self.importmanager = DataImportManager()
+        
+        username = self.userdata['username']
+        self._isadmin = username in ADMINUSERS
+        self._allowedcategories = None if self._isadmin else set(POWERUSERS.get(username, []))
+        
+        self.setWindowTitle("Data Imports - Admin Panel" if self._isadmin else "Data Imports")
+        screen = QApplication.primaryScreen()
+        if screen:
+            avail = screen.availableGeometry()
+            scale = min(avail.width() / 1920.0, avail.height() / 1080.0)
+            self._ui_scale = max(0.60, min(1.0, scale))
+            self.resize(max(700, int(1000 * self._ui_scale)), max(500, int(700 * self._ui_scale)))
+        else:
+            self._ui_scale = 1.0
+            self.resize(1000, 700)
+        self.setupui()
+
+    def _sz(self, n):
+        return max(1, int(n * self._ui_scale))
+
+    def setupui(self):
+        centralwidget = QWidget()
+        self.setCentralWidget(centralwidget)
+        
+        layout = QVBoxLayout()
+        header = QWidget()
+        header.setStyleSheet("background-color: #156082;")
+        headerlayout = QVBoxLayout(header)
+        headerlayout.setContentsMargins(0, 4, 0, 4)
+        
+        title = QLabel("Data Imports Manager")
+        title.setFont(QFont("Arial", max(12, self._sz(18)), QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("color: white; background-color: transparent;")
+        headerlayout.addWidget(title)
+        
+        subtitle = QLabel("Import data files for all applications")
+        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setStyleSheet("color: white; background-color: transparent; margin-bottom: 20px;")
+        headerlayout.addWidget(subtitle)
+        
+        layout.addWidget(header)
+        
+        importgrid = self.createimportbuttons()
+        layout.addWidget(importgrid)
+        
+        historysection = self.createhistorysection()
+        layout.addWidget(historysection)
+        
+        centralwidget.setLayout(layout)
+        
+        self.refreshhistory()
+        
+    def createimportbuttons(self):
+        widget = QWidget()
+        layout = QVBoxLayout()
+        
+        sectiontitle = QLabel("Import Data Files")
+        sectiontitle.setFont(QFont("Arial", max(10, self._sz(14)), QFont.Bold))
+        layout.addWidget(sectiontitle)
+
+        grid = QGridLayout()
+        grid.setSpacing(self._sz(15))
+        
+        importbuttons = [
+            {"title": "Current Inventory Report",
+             "description": "Current Inventory per Part",
+             "category": "current_inventory_report",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "Master Data Reports",
+             "description": "Part Information",
+             "category": "master_data",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "Part Requirement Split 1",
+             "description": "Planned Consumption per Day per Part",
+             "category": "part_requirement_split_1",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "Part Requirement Split 2",
+             "description": "Planned Consumption per Day per Part",
+             "category": "part_requirement_split_2",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "Part Requirement Split 3",
+             "description": "Planned Consumption per Day per Part",
+             "category": "part_requirement_split_3",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "Goods to be Received",
+             "description": "Goods to be received by part per day for the next 365 days",
+             "category": "goods_to_be_received",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "Splunk Receiving Data",
+             "description": "Goods to be received by part per day for the next 60 days",
+             "category": "splunk_receiving_data",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "ASN Simple Search",
+             "description": "Providing link between TO and ASN",
+             "category": "asn_simple_search",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "Manual TTT",
+             "description": "Delivery Days per Supplier",
+             "category": "manual_TTT",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "Goods to be Departed",
+             "description": "Goods to be departed by part per day for the next 90 days",
+             "category": "goods_to_be_departed",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "Alert Report",
+             "description": "Alert Report",
+             "category": "alert_report",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"},
+            {"title": "Part Matrix",
+             "description": "Part Matrix",
+             "category": "part_matrix",
+             "filetypes": "Excel files (*.xlsx *.xls *.xlsm);;CSV files (*.csv)"}
+            ]
+        
+        row = 0
+        col = 0
+        maxcols = 4
+        
+        for buttoninfo in importbuttons:
+            btnwidget = self.createimportbutton(buttoninfo)
+            grid.addWidget(btnwidget, row, col)
+            
+            col += 1
+            if col >= maxcols:
+                col = 0
+                row += 1
+                
+        layout.addLayout(grid)
+        widget.setLayout(layout)
+        return widget
+    
+    def createimportbutton(self, buttoninfo):
+        allowed = self._allowedcategories is None or buttoninfo["category"] in self._allowedcategories
+        widget = QWidget()
+        widget.setMinimumHeight(self._sz(120))
+
+        if allowed:
+            widget.setStyleSheet("""QWidget {background-color: #156082; border: none; border-radius: 8px; padding: 4px;}""")
+            
+        else:
+            widget.setStyleSheet("""QWidget {background-color: #cccccc; border: none; border-radius: 8px; padding: 4px;}""")
+ 
+        layout = QVBoxLayout()
+ 
+        titlelayout = QHBoxLayout()
+        titlelabel = QLabel(buttoninfo["title"])
+        titlelabel.setFont(QFont("Arial", max(9, self._sz(12)), QFont.Bold))
+        titlelabel.setAlignment(Qt.AlignCenter)
+        titlelabel.setStyleSheet("color: white; background-color: transparent")
+        
+        if not allowed:
+            titlelabel.setStyleSheet("color: #666666; background-color: transparent;")
+            
+        titlelayout.addWidget(titlelabel)
+        titlelayout.addStretch()
+        layout.addLayout(titlelayout)
+ 
+        descriptionlabel = QLabel(buttoninfo["description"])
+        descriptionlabel.setFont(QFont("Arial", max(8, self._sz(10))))
+        descriptionlabel.setStyleSheet("color: #0e2841; background-color: transparent;")
+        descriptionlabel.setAlignment(Qt.AlignCenter)
+        descriptionlabel.setWordWrap(True)
+        layout.addWidget(descriptionlabel)
+ 
+        importbtn = QPushButton("Import File" if allowed else "No Access")
+        importbtn.setEnabled(allowed)
+        
+        if allowed:
+            importbtn.setStyleSheet("""QPushButton {background-color: #cccccc; color: grey; border: none; padding: 8px; border-radius: 4px; font-weight: bold;} QPushButton:hover {color: green; background-color: #45a049;}""")
+            importbtn.clicked.connect(lambda checked, info=buttoninfo: self.handleimport(info))
+            
+        else:
+            importbtn.setStyleSheet("""QPushButton {background-color: #bbb; color: #888; border: none; padding: 8px; border-radius: 4px; font-weight: bold;}""")
+            
+        layout.addWidget(importbtn)
+        
+        widget.setLayout(layout)
+        return widget
+    
+    def handleimport(self, buttoninfo):
+        category = buttoninfo["category"]
+        filetypes = buttoninfo["filetypes"]
+        title = buttoninfo["title"]
+        filepath, _ = QFileDialog.getOpenFileName(self, f"Select {title} file to import","",filetypes)
+        
+        if not filepath:
+            return
+        
+        filepath = Path(filepath)
+        try:
+            isvalid, errors, previewdata = self.importmanager.validatefile(filepath, category)
+            
+            if not isvalid:
+                QMessageBox.warning(self, "Validation Failed", "File validation failed:\n\n" + "\n".join(errors))
+                return
+            
+            if errors:
+                reply = QMessageBox.question(self, "Import with Warnings?", "File has warnings but can be imported:\n\n" + "\n".join(errors) + f"\n\nPreview shows {len(previewdata)} rows.\n\nProceed with import?", QMessageBox.Yes | QMessageBox.No)
+                if reply != QMessageBox.Yes:
+                    return
+                
+            username = self.userdata['username']
+            success, message = self.importmanager.importfile(filepath, category, username, f"Imported {title} via Data Imports app")
+            
+            if success:
+                QMessageBox.information(self, "Import Successful", message)
+                self.refreshhistory()
+                
+            else:
+                QMessageBox.critical(self, "Import Failed", message)
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Unexpected error during import: {str(e)}")
+        
+    def createhistorysection(self):
+        widget = QWidget()
+        layout = QVBoxLayout()
+        
+        title = QLabel("Recent Imports")
+        title.setFont(QFont("Arial", max(10, self._sz(14)), QFont.Bold))
+        layout.addWidget(title)
+        
+        self.historytable = QTableWidget()
+        self.historytable.setColumnCount(6)
+        self.historytable.setHorizontalHeaderLabels(["Date/Time", "File Name", "Category", "Imported By", "Status", "Actions"])
+        self.historytable.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.historytable.setSelectionBehavior(QTableWidget.SelectRows)
+        
+        layout.addWidget(self.historytable)
+        
+        refreshbtn = QPushButton("Refresh History")
+        refreshbtn.clicked.connect(self.refreshhistory)
+        refreshbtn.setStyleSheet("""QPushButton {background-color: #156082; color: white; padding: 8px 15px;} QPushButton:hover {background-color: #a2d8f0; color: grey;}""")
+        layout.addWidget(refreshbtn)
+        
+        widget.setLayout(layout)
+        return widget
+    
+    def refreshhistory(self):
+        try:
+            history = self.importmanager.getimporthistory()
+            self.historytable.setRowCount(len(history))
+            
+            for row, item in enumerate(history):
+                importtime = item['importedat'][:19].replace('T', ' ')
+                self.historytable.setItem(row, 0, QTableWidgetItem(importtime))
+                self.historytable.setItem(row, 1, QTableWidgetItem(item['originalfilename']))
+                self.historytable.setItem(row, 2, QTableWidgetItem(item.get('categoryname', item['category'])))
+                self.historytable.setItem(row, 3, QTableWidgetItem(item['importedby']))
+                
+                status = "Success" if item.get('validationpassed', False) else "Warning"
+                self.historytable.setItem(row, 4, QTableWidgetItem(status))
+                self.historytable.setItem(row, 5, QTableWidgetItem("View"))
+                
+            self.historytable.resizeColumnsToContents()
+        
+        except Exception as e:
+            print(f"Error refreshing history: {e}")
+        
+    def closeevent(self, event):
+        event.accept()
+
+    def closeevent(self, event):
+        event.accept()
