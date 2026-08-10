@@ -1994,13 +1994,13 @@ class SupplyChainCoordinationWindow(QMainWindow):
             self.recalculateldjiscoverage()
  
     def displaycoveragetable(self, coveragedf: pd.DataFrame):
-    if coveragedf.empty:
-        return
+         if coveragedf.empty:
+            return
 
-    try:
-        self.coveragetable.itemChanged.disconnect()
-    except Exception:
-        pass
+         try:
+            self.coveragetable.itemChanged.disconnect()
+         except Exception:
+            pass
 
     # ============================================================
     # DISPLAY-ONLY COLUMN ORDER
