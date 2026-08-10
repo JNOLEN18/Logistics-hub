@@ -1993,111 +1993,24 @@ class SupplyChainCoordinationWindow(QMainWindow):
         if 1 <= item.row() <= nmodels and item.column() >= nfixed:
             self.recalculateldjiscoverage()
  
-    def displaycoveragetable(self, coveragedf: pd.DataFrame):
-         if coveragedf.empty:
+def displaycoveragetable(self, coveragedf: pd.DataFrame):
+        if coveragedf.empty:
             return
 
-         try:
-            self.coveragetable.itemChanged.disconnect()
-         except Exception:
-            pass
+    try:
+        self.coveragetable.itemChanged.disconnect()
+    except Exception:
+        pass
 
-    # ============================================================
-    # DISPLAY-ONLY COLUMN ORDER
-    # IMPORTANT:
-    # We are NOT modifying the original coverage dataframe.
-    # We only create a reordered copy for the UI.
-    # ============================================================
+    cols = coveragedf.columns.tolist()
+    n_rows, n_cols = len(coveragedf), len(cols)
+    str_cols = {cols.index(c) for c in ('Part Number', 'MFG Code', 'SHP Code') if c in cols}
 
-    desired_info_order = [
-        'Part Number',
-        'Part Description',
-        'Price',
-        'Unit Load Qty',
-        'Safety Days',
-        'Safety Stock',
-        'MFG Code',
-        'Supplier Name',
-        'SHP Code',
-        'SHP Country',
-        'SCC Name',
-        'Region',
-        'Program Supported',
-        'Day Alert',
-        'Comments',
-    ]
-
-    # Find all daily coverage columns.
-    # These are already converted to MM/DD by renamecolumnstofriendly().
-    daily_columns = []
-
-    for col in coveragedf.columns:
-        if col not in desired_info_order:
-            try:
-                datetime.strptime(str(col), '%m/%d')
-                daily_columns.append(col)
-            except (ValueError, TypeError):
-                pass
-
-    # Sort daily columns by actual calendar date.
-    # This prevents 01/01 from appearing before 08/10
-    # simply because of alphabetical sorting.
-    def get_display_date(col):
-        try:
-            return datetime.strptime(str(col), '%m/%d')
-        except (ValueError, TypeError):
-            return datetime.max
-
-    daily_columns = sorted(daily_columns, key=get_display_date)
-
-    # Information columns that actually exist.
-    info_columns = [
-        col
-        for col in desired_info_order
-        if col in coveragedf.columns
-    ]
-
-    # Preserve any unexpected non-daily columns.
-    known_columns = set(info_columns + daily_columns)
-
-    extra_columns = [
-        col
-        for col in coveragedf.columns
-        if col not in known_columns
-    ]
-
-    # FINAL DISPLAY ORDER:
-    # Information -> Coverage columns
-    display_order = info_columns + extra_columns + daily_columns
-
-    # IMPORTANT:
-    # Only reorder a COPY.
-    # The original coveragedf is untouched.
-    displaydf = coveragedf.loc[:, display_order].copy()
-
-    cols = displaydf.columns.tolist()
-    n_rows, n_cols = len(displaydf), len(cols)
-
-    str_cols = {
-        cols.index(c)
-        for c in ('Part Number', 'MFG Code', 'SHP Code')
-        if c in cols
-    }
-
-    # Always update the header labels.
-    # This is important because the column order can change
-    # even when the number of columns remains the same.
     if not hasattr(self, '_last_column_count') or self._last_column_count != n_cols:
         self.coveragetable.setColumnCount(n_cols)
+        self.coveragetable.setHorizontalHeaderLabels(cols)
         self._last_column_count = n_cols
-
-    self.coveragetable.setHorizontalHeaderLabels(cols)
-
-    self.comments_col = (
-        cols.index('Comments')
-        if 'Comments' in cols
-        else None
-    )
+        self.comments_col = cols.index('Comments') if 'Comments' in cols else None
 
     self.coveragetable.setSortingEnabled(False)
     self.coveragetable.setUpdatesEnabled(False)
@@ -2105,157 +2018,81 @@ class SupplyChainCoordinationWindow(QMainWindow):
     try:
         self.coveragetable.setRowCount(n_rows)
 
-        data = displaydf.values
-
-        # ========================================================
-        # Find where daily coverage starts
-        # ========================================================
+        data = coveragedf.values
 
         daily_start = None
-
         for i, col in enumerate(cols):
-            if col in daily_columns:
+            try:
+                datetime.strptime(col, '%m/%d')
                 daily_start = i
                 break
-
-        # ========================================================
-        # Unit Load Qty
-        # ========================================================
+            except ValueError:
+                pass
 
         unit_loads = (
-            pd.to_numeric(
-                displaydf['Unit Load Qty'],
-                errors='coerce'
-            ).fillna(1).clip(lower=1).values
+            coveragedf['Unit Load Qty'].fillna(1).clip(lower=1).values
             if 'Unit Load Qty' in cols
             else None
         )
 
-        # ========================================================
-        # Populate table
-        # ========================================================
-
         for row in range(n_rows):
-
             ulq = unit_loads[row] if unit_loads is not None else 1
 
             for col in range(n_cols):
-
                 value = data[row, col]
-
-                isnumeric = (
-                    isinstance(value, (int, float, np.integer, np.floating))
-                    and pd.notna(value)
-                )
+                isnumeric = isinstance(value, (int, float)) and value == value
 
                 if isnumeric and col not in str_cols:
-                    if abs(float(value)) >= 1:
-                        display_value = f"{float(value):,.0f}"
-                    else:
-                        display_value = f"{float(value):.2f}"
-
-                elif pd.isna(value):
+                    display_value = f"{value:,.0f}" if abs(value) >= 1 else f"{value:.2f}"
+                elif isinstance(value, float) and value != value:
                     display_value = ""
-
                 else:
                     display_value = str(value) if value is not None else ""
 
-                # ====================================================
-                # Day Alert sorting
-                # ====================================================
-
                 if cols[col] == 'Day Alert':
-
                     try:
                         sort_value = int(value)
-
                     except (ValueError, TypeError):
-
                         text = str(display_value).strip()
-
                         if text.lower() == 'covered':
                             sort_value = 999
-
                         else:
                             m = re.search(r'(\d+)', text)
                             sort_value = int(m.group(1)) if m else 999999
-
-                    item = NumericSortTableWidgetItem(
-                        display_value,
-                        sort_value
-                    )
-
+                    item = NumericSortTableWidgetItem(display_value, sort_value)
                 else:
                     item = QTableWidgetItem(display_value)
-
-                # ====================================================
-                # Comments editable
-                # ====================================================
-
                 item.setFlags(
                     (item.flags() | Qt.ItemIsEditable)
                     if col == self.comments_col
                     else (item.flags() & ~Qt.ItemIsEditable)
                 )
 
-                # ====================================================
-                # Coverage cell formatting
-                # ====================================================
-
                 if daily_start is not None and col >= daily_start and isnumeric:
-
-                    numeric_value = float(value)
-
-                    if numeric_value <= 0:
-
-                        item.setBackground(
-                            QColor(255, 204, 204)
-                        )
-                        item.setForeground(
-                            QColor(156, 0, 6)
-                        )
-
-                    elif numeric_value < ulq:
-
-                        item.setBackground(
-                            QColor(255, 255, 204)
-                        )
-                        item.setForeground(
-                            QColor(156, 156, 6)
-                        )
+                    if value <= 0:
+                        item.setBackground(QColor(255, 204, 204))
+                        item.setForeground(QColor(156, 0, 6))
+                    elif value < ulq:
+                        item.setBackground(QColor(255, 255, 204))
+                        item.setForeground(QColor(156, 156, 6))
 
                 self.coveragetable.setItem(row, col, item)
 
     finally:
-
         self.coveragetable.setUpdatesEnabled(True)
-
         self.coveragetable.resizeColumnsToContents()
-
         if self.comments_col is not None:
-
-            self.coveragetable.setColumnWidth(
-                self.comments_col,
-                200
-            )
-
-            if 'Comments' in displaydf.columns:
-
-                comments_vals = displaydf['Comments'].values
-
+            self.coveragetable.setColumnWidth(self.comments_col, 200)
+            if 'Comments' in coveragedf.columns:
+                comments_vals = coveragedf['Comments'].values
                 for row in range(n_rows):
-
                     if str(comments_vals[row]).strip():
                         self.coveragetable.resizeRowToContents(row)
-
         self.coveragetable.setSortingEnabled(True)
-
-        self.coveragetable.itemChanged.connect(
-            self.oncommentchanged
-        )
-
-        self._reapplycoveragehiddencolumns()
+        self.coveragetable.itemChanged.connect(self.oncommentchanged)
+        self._reapplycoveragehiddencolumns() 
         self._applyfrozencolumns()
+
  
     def oncommentchanged(self, item):
         try:
