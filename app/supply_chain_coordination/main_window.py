@@ -1996,102 +1996,102 @@ class SupplyChainCoordinationWindow(QMainWindow):
 def displaycoveragetable(self, coveragedf: pd.DataFrame):
         if coveragedf.empty:
             return
-
-    try:
-        self.coveragetable.itemChanged.disconnect()
-    except Exception:
-        pass
-
-    cols = coveragedf.columns.tolist()
-    n_rows, n_cols = len(coveragedf), len(cols)
-    str_cols = {cols.index(c) for c in ('Part Number', 'MFG Code', 'SHP Code') if c in cols}
-
-    if not hasattr(self, '_last_column_count') or self._last_column_count != n_cols:
-        self.coveragetable.setColumnCount(n_cols)
-        self.coveragetable.setHorizontalHeaderLabels(cols)
-        self._last_column_count = n_cols
-        self.comments_col = cols.index('Comments') if 'Comments' in cols else None
-
-    self.coveragetable.setSortingEnabled(False)
-    self.coveragetable.setUpdatesEnabled(False)
-
-    try:
-        self.coveragetable.setRowCount(n_rows)
-
-        data = coveragedf.values
-
-        daily_start = None
-        for i, col in enumerate(cols):
-            try:
-                datetime.strptime(col, '%m/%d')
-                daily_start = i
-                break
-            except ValueError:
-                pass
-
-        unit_loads = (
-            coveragedf['Unit Load Qty'].fillna(1).clip(lower=1).values
-            if 'Unit Load Qty' in cols
-            else None
-        )
-
-        for row in range(n_rows):
-            ulq = unit_loads[row] if unit_loads is not None else 1
-
-            for col in range(n_cols):
-                value = data[row, col]
-                isnumeric = isinstance(value, (int, float)) and value == value
-
-                if isnumeric and col not in str_cols:
-                    display_value = f"{value:,.0f}" if abs(value) >= 1 else f"{value:.2f}"
-                elif isinstance(value, float) and value != value:
-                    display_value = ""
-                else:
-                    display_value = str(value) if value is not None else ""
-
-                if cols[col] == 'Day Alert':
-                    try:
-                        sort_value = int(value)
-                    except (ValueError, TypeError):
-                        text = str(display_value).strip()
-                        if text.lower() == 'covered':
-                            sort_value = 999
-                        else:
-                            m = re.search(r'(\d+)', text)
-                            sort_value = int(m.group(1)) if m else 999999
-                    item = NumericSortTableWidgetItem(display_value, sort_value)
-                else:
-                    item = QTableWidgetItem(display_value)
-                item.setFlags(
-                    (item.flags() | Qt.ItemIsEditable)
-                    if col == self.comments_col
-                    else (item.flags() & ~Qt.ItemIsEditable)
-                )
-
-                if daily_start is not None and col >= daily_start and isnumeric:
-                    if value <= 0:
-                        item.setBackground(QColor(255, 204, 204))
-                        item.setForeground(QColor(156, 0, 6))
-                    elif value < ulq:
-                        item.setBackground(QColor(255, 255, 204))
-                        item.setForeground(QColor(156, 156, 6))
-
-                self.coveragetable.setItem(row, col, item)
-
-    finally:
-        self.coveragetable.setUpdatesEnabled(True)
-        self.coveragetable.resizeColumnsToContents()
-        if self.comments_col is not None:
-            self.coveragetable.setColumnWidth(self.comments_col, 200)
-            if 'Comments' in coveragedf.columns:
-                comments_vals = coveragedf['Comments'].values
-                for row in range(n_rows):
-                    if str(comments_vals[row]).strip():
-                        self.coveragetable.resizeRowToContents(row)
-        self.coveragetable.setSortingEnabled(True)
-        self.coveragetable.itemChanged.connect(self.oncommentchanged)
-        self._reapplycoveragehiddencolumns() 
-        self._applyfrozencolumns()
+ 
+        try:
+            self.coveragetable.itemChanged.disconnect()
+        except Exception:
+            pass
+ 
+        cols = coveragedf.columns.tolist()
+        n_rows, n_cols = len(coveragedf), len(cols)
+        str_cols = {cols.index(c) for c in ('Part Number', 'MFG Code', 'SHP Code') if c in cols}
+ 
+        if not hasattr(self, '_last_column_count') or self._last_column_count != n_cols:
+            self.coveragetable.setColumnCount(n_cols)
+            self.coveragetable.setHorizontalHeaderLabels(cols)
+            self._last_column_count = n_cols
+            self.comments_col = cols.index('Comments') if 'Comments' in cols else None
+ 
+        self.coveragetable.setSortingEnabled(False)
+        self.coveragetable.setUpdatesEnabled(False)
+ 
+        try:
+            self.coveragetable.setRowCount(n_rows)
+ 
+            data = coveragedf.values
+ 
+            daily_start = None
+            for i, col in enumerate(cols):
+                try:
+                    datetime.strptime(col, '%m/%d')
+                    daily_start = i
+                    break
+                except ValueError:
+                    pass
+ 
+            unit_loads = (
+                coveragedf['Unit Load Qty'].fillna(1).clip(lower=1).values
+                if 'Unit Load Qty' in cols
+                else None
+            )
+ 
+            for row in range(n_rows):
+                ulq = unit_loads[row] if unit_loads is not None else 1
+ 
+                for col in range(n_cols):
+                    value = data[row, col]
+                    isnumeric = isinstance(value, (int, float)) and value == value
+ 
+                    if isnumeric and col not in str_cols:
+                        display_value = f"{value:,.0f}" if abs(value) >= 1 else f"{value:.2f}"
+                    elif isinstance(value, float) and value != value:
+                        display_value = ""
+                    else:
+                        display_value = str(value) if value is not None else ""
+ 
+                    if cols[col] == 'Day Alert':
+                        try:
+                            sort_value = int(value)
+                        except (ValueError, TypeError):
+                            text = str(display_value).strip()
+                            if text.lower() == 'covered':
+                                sort_value = 999
+                            else:
+                                m = re.search(r'(\d+)', text)
+                                sort_value = int(m.group(1)) if m else 999999
+                        item = NumericSortTableWidgetItem(display_value, sort_value)
+                    else:
+                        item = QTableWidgetItem(display_value)
+                    item.setFlags(
+                        (item.flags() | Qt.ItemIsEditable)
+                        if col == self.comments_col
+                        else (item.flags() & ~Qt.ItemIsEditable)
+                    )
+ 
+                    if daily_start is not None and col >= daily_start and isnumeric:
+                        if value <= 0:
+                            item.setBackground(QColor(255, 204, 204))
+                            item.setForeground(QColor(156, 0, 6))
+                        elif value < ulq:
+                            item.setBackground(QColor(255, 255, 204))
+                            item.setForeground(QColor(156, 156, 6))
+ 
+                    self.coveragetable.setItem(row, col, item)
+ 
+        finally:
+            self.coveragetable.setUpdatesEnabled(True)
+            self.coveragetable.resizeColumnsToContents()
+            if self.comments_col is not None:
+                self.coveragetable.setColumnWidth(self.comments_col, 200)
+                if 'Comments' in coveragedf.columns:
+                    comments_vals = coveragedf['Comments'].values
+                    for row in range(n_rows):
+                        if str(comments_vals[row]).strip():
+                            self.coveragetable.resizeRowToContents(row)
+            self.coveragetable.setSortingEnabled(True)
+            self.coveragetable.itemChanged.connect(self.oncommentchanged)
+            self._reapplycoveragehiddencolumns() 
+            self._applyfrozencolumns()
 
  
     def oncommentchanged(self, item):
