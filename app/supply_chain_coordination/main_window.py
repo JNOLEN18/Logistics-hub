@@ -1993,7 +1993,7 @@ class SupplyChainCoordinationWindow(QMainWindow):
         if 1 <= item.row() <= nmodels and item.column() >= nfixed:
             self.recalculateldjiscoverage()
  
-def displaycoveragetable(self, coveragedf: pd.DataFrame):
+    def displaycoveragetable(self, coveragedf: pd.DataFrame):
         if coveragedf.empty:
             return
  
@@ -2092,7 +2092,6 @@ def displaycoveragetable(self, coveragedf: pd.DataFrame):
             self.coveragetable.itemChanged.connect(self.oncommentchanged)
             self._reapplycoveragehiddencolumns() 
             self._applyfrozencolumns()
-
  
     def oncommentchanged(self, item):
         try:
