@@ -308,7 +308,7 @@ class CoverageAnalysisEngine:
         col for col in coveragedf.columns
         if col.startswith('Day_')
         and len(col.split('_')) >= 5
-    ]
+        ]
 
     # Sort using the COMPLETE date including the year.
     # This is what prevents 01/01/2027 from being placed
@@ -325,10 +325,10 @@ class CoverageAnalysisEngine:
         except Exception:
             return datetime.max
 
-    daycolumns = sorted(
+        daycolumns = sorted(
         daycolumns,
         key=get_day_date
-    )
+        )
 
     # Put standard information columns first.
     finalorder = [
