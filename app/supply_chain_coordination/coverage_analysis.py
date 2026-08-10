@@ -298,41 +298,63 @@ class CoverageAnalysisEngine:
     if coveragedf.empty:
         return coveragedf
 
-    # Final display order for all information columns.
-    information_columns = [
-        'Part Number',
-        'Part Description',
-        'Price',
-        'Unit Load Qty',
-        'Safety Days',
-        'Safety Stock',
-        'MFG Code',
-        'Supplier Name',
-        'SHP Code',
-        'SHP Country',
-        'SCC Name',
+    preferredorder = [
+        'PART_NO',
+        'PART_DESC',
+        'SUPP_MFG',
+        'SUPP_NAME',
+        'SUPP_SHP',
+        'SUPP_SHP_COUNTRY',
         'Region',
         'Program Supported',
+        'SAFETY',
+        'STOCK',
+        'UNIT_LOAD_QTY',
+        'PRICE',
+        'SCC_NAME',
         'Day Alert',
         'Comments',
     ]
 
-    # Coverage columns are everything beginning with a date such as:
-    # 08/10, 08/11, 08/12, etc.
-    coverage_columns = [
-        col for col in coveragedf.columns
-        if col not in information_columns
+    daycolumns = [
+        col
+        for col in coveragedf.columns
+        if col.startswith('Day_')
+        and len(col.split('_')) >= 5
     ]
 
-    # Put information columns first, then coverage columns.
-    final_order = [
-        col for col in information_columns
+    def get_day_date(col):
+        try:
+            parts = col.split('_')
+            return datetime.strptime(
+                f"{parts[2]}_{parts[3]}_{parts[4]}",
+                "%Y_%m_%d"
+            )
+        except Exception:
+            return datetime.max
+
+    daycolumns = sorted(
+        daycolumns,
+        key=get_day_date
+    )
+
+    finalorder = [
+        col
+        for col in preferredorder
         if col in coveragedf.columns
     ]
 
-    final_order.extend(coverage_columns)
+    finalorder.extend(daycolumns)
 
-    return coveragedf[final_order]
+    placed = set(finalorder)
+
+    finalorder.extend(
+        col
+        for col in coveragedf.columns
+        if col not in placed
+    )
+
+    return coveragedf[finalorder]
  
     def buildcoverageanalysis(self, datadict: Dict[str, pd.DataFrame], target_consumption_days: int = 30) -> pd.DataFrame:
         uniqueparts = self.getpartswithconsumption(
@@ -350,8 +372,8 @@ class CoverageAnalysisEngine:
         coveragedf = self.addcoveragecomments(coveragedf)
         coveragedf = self.adddailyprojections(coveragedf, datadict, target_consumption_days)
         coveragedf = self.adddaysuntilzerocolumn(coveragedf)
-        coveragedf = self.renamecolumnstofriendly(coveragedf)
         coveragedf = self.reordercolumns(coveragedf)
+        coveragedf = self.renamecolumnstofriendly(coveragedf)
         coveragedf = self.sortbydaystozerofriendly(coveragedf)
  
         return coveragedf
