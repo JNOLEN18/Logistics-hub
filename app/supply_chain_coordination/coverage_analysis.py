@@ -297,59 +297,83 @@ class CoverageAnalysisEngine:
     def reordercolumns(self, coveragedf: pd.DataFrame) -> pd.DataFrame:
         if coveragedf.empty:
             return coveragedf
- 
+
         preferredorder = [
-            'Part Number', 'Part Description', 'MFG Code', 'Supplier Name',
-            'SHP Code', 'SHP Country', 'Region', 'Program Supported', 'Safety Days', 'Safety Stock',
-            'Unit Load Qty', 'Price', 'SCC Name', 'Day Alert', 'Comments',
+            'Part Number',
+            'Part Description',
+            'MFG Code',
+            'Supplier Name',
+            'SHP Code',
+            'SHP Country',
+            'Region',
+            'Program Supported',
+            'Safety Days',
+            'Safety Stock',
+            'Unit Load Qty',
+            'Price',
+            'SCC Name',
+            'Day Alert',
+            'Comments',
         ]
- 
+
+        # Find all daily coverage columns.
+        # At this point they still look like:
+        # Day_000_2026_08_10
+        # Day_001_2026_08_11
+        # ...
+        # Day_144_2027_01_01
+
         daycolumns = [
-        col for col in coveragedf.columns
-        if col.startswith('Day_')
-        and len(col.split('_')) >= 5
+            col
+            for col in coveragedf.columns
+            if col.startswith('Day_')
+            and len(col.split('_')) >= 5
         ]
 
-    # Sort using the COMPLETE date including the year.
-    # This is what prevents 01/01/2027 from being placed
-    # before 08/10/2026.
-    def get_day_date(col):
-        try:
-            parts = col.split('_')
+        # Sort using the COMPLETE date including the year.
+        # This prevents January 2027 from being placed
+        # before August 2026.
 
-            return datetime.strptime(
-                f"{parts[2]}_{parts[3]}_{parts[4]}",
-                "%Y_%m_%d"
-            )
+        def get_day_date(col):
+            try:
+                parts = col.split('_')
 
-        except Exception:
-            return datetime.max
+                return datetime.strptime(
+                    f"{parts[2]}_{parts[3]}_{parts[4]}",
+                    "%Y_%m_%d"
+                )
+
+            except Exception:
+                return datetime.max
 
         daycolumns = sorted(
-        daycolumns,
-        key=get_day_date
+            daycolumns,
+            key=get_day_date
         )
 
-    # Put standard information columns first.
-    finalorder = [
-        col
-        for col in preferredorder
-        if col in coveragedf.columns
-    ]
+        # Put standard information columns first.
 
-    # Then put daily coverage columns in chronological order.
-    finalorder.extend(daycolumns)
+        finalorder = [
+            col
+            for col in preferredorder
+            if col in coveragedf.columns
+        ]
 
-    # Preserve any other columns that may exist.
-    placed = set(finalorder)
+        # Then put daily coverage columns in chronological order.
 
-    finalorder.extend(
-        col
-        for col in coveragedf.columns
-        if col not in placed
-    )
+        finalorder.extend(daycolumns)
 
-    return coveragedf[finalorder]
+        # Preserve any other columns that may exist.
+
+        placed = set(finalorder)
+
+        finalorder.extend(
+            col
+            for col in coveragedf.columns
+            if col not in placed
+        )
+
+        return coveragedf[finalorder]
  
     def buildcoverageanalysis(self, datadict: Dict[str, pd.DataFrame], target_consumption_days: int = 30) -> pd.DataFrame:
         uniqueparts = self.getpartswithconsumption(
