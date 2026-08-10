@@ -297,27 +297,27 @@ class CoverageAnalysisEngine:
     def reordercolumns(self, coveragedf: pd.DataFrame) -> pd.DataFrame:
         if coveragedf.empty:
             return coveragedf
-
+ 
         preferredorder = [
             'Part Number', 'Part Description', 'MFG Code', 'Supplier Name',
             'SHP Code', 'SHP Country', 'Region', 'Program Supported', 'Safety Days', 'Safety Stock',
             'Unit Load Qty', 'Price', 'SCC Name', 'Day Alert', 'Comments',
         ]
-
+ 
         dateparsed: Dict[str, datetime] = {}
         for col in coveragedf.columns:
             try:
                 dateparsed[col] = datetime.strptime(col, '%m/%d')
             except Exception:
                 pass
-
+ 
         datecolumns = sorted(dateparsed, key=dateparsed.__getitem__)
-
+ 
         finalorder = [col for col in preferredorder if col in coveragedf.columns]
         finalorder.extend(datecolumns)
         placed = set(finalorder)
         finalorder.extend(col for col in coveragedf.columns if col not in placed)
-
+ 
         return coveragedf[finalorder]
  
     def buildcoverageanalysis(self, datadict: Dict[str, pd.DataFrame], target_consumption_days: int = 30) -> pd.DataFrame:
