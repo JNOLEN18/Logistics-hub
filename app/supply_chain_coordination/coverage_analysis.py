@@ -295,84 +295,44 @@ class CoverageAnalysisEngine:
         return coveragedf.rename(columns=columnmapping)
  
     def reordercolumns(self, coveragedf: pd.DataFrame) -> pd.DataFrame:
-        if coveragedf.empty:
-            return coveragedf
+    if coveragedf.empty:
+        return coveragedf
 
-        # These are the RAW column names that exist BEFORE
-        # renamecolumnstofriendly() is called.
-        preferredorder = [
-            'PART_NO',
-            'PART_DESC',
-            'SUPP_MFG',
-            'SUPP_NAME',
-            'SUPP_SHP',
-            'SUPP_SHP_COUNTRY',
-            'Region',
-            'Program Supported',
-            'SAFETY',
-            'STOCK',
-            'UNIT_LOAD_QTY',
-            'PRICE',
-            'SCC_NAME',
-            'Day Alert',
-            'Comments',
-        ]
+    # Final display order for all information columns.
+    information_columns = [
+        'Part Number',
+        'Part Description',
+        'Price',
+        'Unit Load Qty',
+        'Safety Days',
+        'Safety Stock',
+        'MFG Code',
+        'Supplier Name',
+        'SHP Code',
+        'SHP Country',
+        'SCC Name',
+        'Region',
+        'Program Supported',
+        'Day Alert',
+        'Comments',
+    ]
 
-        # Find all daily coverage columns.
-        # At this point they still look like:
-        #
-        # Day_000_2026_08_10
-        # Day_001_2026_08_11
-        # ...
-        # Day_143_2026_12_31
-        # Day_144_2027_01_01
+    # Coverage columns are everything beginning with a date such as:
+    # 08/10, 08/11, 08/12, etc.
+    coverage_columns = [
+        col for col in coveragedf.columns
+        if col not in information_columns
+    ]
 
-        daycolumns = [
-            col
-            for col in coveragedf.columns
-            if col.startswith('Day_')
-            and len(col.split('_')) >= 5
-        ]
+    # Put information columns first, then coverage columns.
+    final_order = [
+        col for col in information_columns
+        if col in coveragedf.columns
+    ]
 
-        # Sort using the COMPLETE date including the year.
-        # This keeps August 2026 -> December 2026 -> January 2027.
-        def get_day_date(col):
-            try:
-                parts = col.split('_')
+    final_order.extend(coverage_columns)
 
-                return datetime.strptime(
-                    f"{parts[2]}_{parts[3]}_{parts[4]}",
-                    "%Y_%m_%d"
-                )
-
-            except Exception:
-                return datetime.max
-
-        daycolumns = sorted(
-            daycolumns,
-            key=get_day_date
-        )
-
-        # Put all information columns first.
-        finalorder = [
-            col
-            for col in preferredorder
-            if col in coveragedf.columns
-        ]
-
-        # Put coverage/date columns AFTER all information columns.
-        finalorder.extend(daycolumns)
-
-        # Preserve any unexpected columns at the end.
-        placed = set(finalorder)
-
-        finalorder.extend(
-            col
-            for col in coveragedf.columns
-            if col not in placed
-        )
-
-        return coveragedf[finalorder]
+    return coveragedf[final_order]
  
     def buildcoverageanalysis(self, datadict: Dict[str, pd.DataFrame], target_consumption_days: int = 30) -> pd.DataFrame:
         uniqueparts = self.getpartswithconsumption(
@@ -390,8 +350,8 @@ class CoverageAnalysisEngine:
         coveragedf = self.addcoveragecomments(coveragedf)
         coveragedf = self.adddailyprojections(coveragedf, datadict, target_consumption_days)
         coveragedf = self.adddaysuntilzerocolumn(coveragedf)
-        coveragedf = self.reordercolumns(coveragedf)
         coveragedf = self.renamecolumnstofriendly(coveragedf)
+        coveragedf = self.reordercolumns(coveragedf)
         coveragedf = self.sortbydaystozerofriendly(coveragedf)
  
         return coveragedf
