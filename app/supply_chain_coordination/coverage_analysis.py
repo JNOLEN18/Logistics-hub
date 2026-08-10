@@ -298,29 +298,33 @@ class CoverageAnalysisEngine:
         if coveragedf.empty:
             return coveragedf
 
+        # These are the RAW column names that exist BEFORE
+        # renamecolumnstofriendly() is called.
         preferredorder = [
-            'Part Number',
-            'Part Description',
-            'MFG Code',
-            'Supplier Name',
-            'SHP Code',
-            'SHP Country',
+            'PART_NO',
+            'PART_DESC',
+            'SUPP_MFG',
+            'SUPP_NAME',
+            'SUPP_SHP',
+            'SUPP_SHP_COUNTRY',
             'Region',
             'Program Supported',
-            'Safety Days',
-            'Safety Stock',
-            'Unit Load Qty',
-            'Price',
-            'SCC Name',
+            'SAFETY',
+            'STOCK',
+            'UNIT_LOAD_QTY',
+            'PRICE',
+            'SCC_NAME',
             'Day Alert',
             'Comments',
         ]
 
         # Find all daily coverage columns.
         # At this point they still look like:
+        #
         # Day_000_2026_08_10
         # Day_001_2026_08_11
         # ...
+        # Day_143_2026_12_31
         # Day_144_2027_01_01
 
         daycolumns = [
@@ -331,9 +335,7 @@ class CoverageAnalysisEngine:
         ]
 
         # Sort using the COMPLETE date including the year.
-        # This prevents January 2027 from being placed
-        # before August 2026.
-
+        # This keeps August 2026 -> December 2026 -> January 2027.
         def get_day_date(col):
             try:
                 parts = col.split('_')
@@ -351,20 +353,17 @@ class CoverageAnalysisEngine:
             key=get_day_date
         )
 
-        # Put standard information columns first.
-
+        # Put all information columns first.
         finalorder = [
             col
             for col in preferredorder
             if col in coveragedf.columns
         ]
 
-        # Then put daily coverage columns in chronological order.
-
+        # Put coverage/date columns AFTER all information columns.
         finalorder.extend(daycolumns)
 
-        # Preserve any other columns that may exist.
-
+        # Preserve any unexpected columns at the end.
         placed = set(finalorder)
 
         finalorder.extend(
