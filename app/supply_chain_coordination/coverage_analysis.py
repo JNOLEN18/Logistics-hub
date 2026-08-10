@@ -304,21 +304,52 @@ class CoverageAnalysisEngine:
             'Unit Load Qty', 'Price', 'SCC Name', 'Day Alert', 'Comments',
         ]
  
-        dateparsed: Dict[str, datetime] = {}
-        for col in coveragedf.columns:
-            try:
-                dateparsed[col] = datetime.strptime(col, '%m/%d')
-            except Exception:
-                pass
- 
-        datecolumns = sorted(dateparsed, key=dateparsed.__getitem__)
- 
-        finalorder = [col for col in preferredorder if col in coveragedf.columns]
-        finalorder.extend(datecolumns)
-        placed = set(finalorder)
-        finalorder.extend(col for col in coveragedf.columns if col not in placed)
- 
-        return coveragedf[finalorder]
+        daycolumns = [
+        col for col in coveragedf.columns
+        if col.startswith('Day_')
+        and len(col.split('_')) >= 5
+    ]
+
+    # Sort using the COMPLETE date including the year.
+    # This is what prevents 01/01/2027 from being placed
+    # before 08/10/2026.
+    def get_day_date(col):
+        try:
+            parts = col.split('_')
+
+            return datetime.strptime(
+                f"{parts[2]}_{parts[3]}_{parts[4]}",
+                "%Y_%m_%d"
+            )
+
+        except Exception:
+            return datetime.max
+
+    daycolumns = sorted(
+        daycolumns,
+        key=get_day_date
+    )
+
+    # Put standard information columns first.
+    finalorder = [
+        col
+        for col in preferredorder
+        if col in coveragedf.columns
+    ]
+
+    # Then put daily coverage columns in chronological order.
+    finalorder.extend(daycolumns)
+
+    # Preserve any other columns that may exist.
+    placed = set(finalorder)
+
+    finalorder.extend(
+        col
+        for col in coveragedf.columns
+        if col not in placed
+    )
+
+    return coveragedf[finalorder]
  
     def buildcoverageanalysis(self, datadict: Dict[str, pd.DataFrame], target_consumption_days: int = 30) -> pd.DataFrame:
         uniqueparts = self.getpartswithconsumption(
@@ -336,8 +367,8 @@ class CoverageAnalysisEngine:
         coveragedf = self.addcoveragecomments(coveragedf)
         coveragedf = self.adddailyprojections(coveragedf, datadict, target_consumption_days)
         coveragedf = self.adddaysuntilzerocolumn(coveragedf)
-        coveragedf = self.renamecolumnstofriendly(coveragedf)
         coveragedf = self.reordercolumns(coveragedf)
+        coveragedf = self.renamecolumnstofriendly(coveragedf)
         coveragedf = self.sortbydaystozerofriendly(coveragedf)
  
         return coveragedf
