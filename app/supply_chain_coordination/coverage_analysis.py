@@ -311,7 +311,7 @@ class CoverageAnalysisEngine:
             except Exception:
                 pass
  
-        datecolumns = sorted(dateparsed, key=dateparsed.__getitem__)
+        datecolumns = list(dateparsed.keys())
  
         finalorder = [col for col in preferredorder if col in coveragedf.columns]
         finalorder.extend(datecolumns)
